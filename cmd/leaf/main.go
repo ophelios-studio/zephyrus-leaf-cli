@@ -9,7 +9,8 @@ import (
 	"os"
 )
 
-const version = "0.0.0-dev"
+// version is overwritten at release build time via -ldflags "-X main.version=...".
+var version = "0.0.0-dev"
 
 func main() {
 	if len(os.Args) < 2 {
