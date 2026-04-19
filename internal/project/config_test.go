@@ -76,6 +76,70 @@ func TestLoad_Invalid(t *testing.T) {
 	}
 }
 
+func TestNormalizeHooks(t *testing.T) {
+	cases := []struct {
+		name string
+		yaml string
+		want [][]string
+	}{
+		{
+			name: "empty list",
+			yaml: "leaf:\n  name: S\n  post_build: []\n",
+			want: nil,
+		},
+		{
+			name: "string entries",
+			yaml: "leaf:\n  name: S\n  post_build:\n    - ./a.sh\n    - ./b.sh\n",
+			want: [][]string{{"./a.sh"}, {"./b.sh"}},
+		},
+		{
+			name: "argv sequence entries",
+			yaml: "leaf:\n  name: S\n  post_build:\n    - [\"./deploy.sh\", \"--prod\"]\n    - [\"./opt.sh\"]\n",
+			want: [][]string{{"./deploy.sh", "--prod"}, {"./opt.sh"}},
+		},
+		{
+			name: "mixed string and argv",
+			yaml: "leaf:\n  name: S\n  post_build:\n    - ./a.sh\n    - [\"./b.sh\", \"x\"]\n",
+			want: [][]string{{"./a.sh"}, {"./b.sh", "x"}},
+		},
+		{
+			name: "empty strings dropped",
+			yaml: "leaf:\n  name: S\n  post_build:\n    - \"\"\n    - ./ok.sh\n    - []\n    - [\"./has-arg\", \"\"]\n",
+			want: [][]string{{"./ok.sh"}, {"./has-arg"}},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := writeConfig(t, tc.yaml)
+			cfg, err := Load(dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := cfg.NormalizeHooks()
+			if len(got) != len(tc.want) {
+				t.Fatalf("len mismatch: got %d (%#v), want %d (%#v)", len(got), got, len(tc.want), tc.want)
+			}
+			for i := range got {
+				if !equalStringSlice(got[i].Argv, tc.want[i]) {
+					t.Errorf("hook %d: got %v, want %v", i, got[i].Argv, tc.want[i])
+				}
+			}
+		})
+	}
+}
+
+func equalStringSlice(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
 func TestValidate_RequiresName(t *testing.T) {
 	c := &Config{}
 	if err := c.Validate(); err == nil {

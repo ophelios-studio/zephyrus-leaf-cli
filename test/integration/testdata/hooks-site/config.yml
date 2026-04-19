@@ -1,0 +1,12 @@
+leaf:
+  name: "Hooks Fixture"
+  version: "0.1.0"
+  description: "Fixture that exercises post_build hooks."
+  content_path: "content"
+  output_path: "dist"
+  production_url: "https://example.test"
+  sections:
+    guide: "Guide"
+  post_build:
+    - "./scripts/touch-marker.sh"
+    - ["./scripts/write-stamp.sh", "second-hook"]

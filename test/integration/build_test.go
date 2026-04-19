@@ -86,7 +86,9 @@ func copyDir(src, dst string) error {
 		if err != nil {
 			return err
 		}
-		return os.WriteFile(target, data, 0o644)
+		// Preserve the source file mode so executables stay executable
+		// (integration tests rely on shell scripts being runnable).
+		return os.WriteFile(target, data, info.Mode().Perm())
 	})
 }
 
@@ -94,6 +96,70 @@ func copyDir(src, dst string) error {
 // the framework baked in, LEAF_DEFAULTS_DIR unset, init + build should still
 // succeed. Skips when the local environment can't compile with that tag
 // (no staged framework tree).
+func TestBuild_PostBuildHooks(t *testing.T) {
+	requirePHP(t)
+	defaults := defaultsDir(t)
+	bin := buildBinary(t)
+	fixture := prepareFixture(t, "hooks-site")
+
+	// Clean any stale sentinels from a prior run.
+	os.Remove(filepath.Join(fixture, "hook-marker.txt"))
+	os.Remove(filepath.Join(fixture, "hook-stamp.txt"))
+
+	cmd := exec.Command(bin, "build", "--dir", fixture)
+	cmd.Env = append(os.Environ(), "LEAF_DEFAULTS_DIR="+defaults)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("leaf build failed: %v\n%s", err, out)
+	}
+	if !strings.Contains(string(out), "Running post_build hooks") {
+		t.Errorf("expected hook announcement in build log; got:\n%s", out)
+	}
+
+	marker, err := os.ReadFile(filepath.Join(fixture, "hook-marker.txt"))
+	if err != nil {
+		t.Fatalf("first hook did not run (hook-marker.txt missing): %v", err)
+	}
+	if !strings.Contains(string(marker), "FIRST_HOOK_RAN") {
+		t.Errorf("first hook wrote unexpected contents: %q", marker)
+	}
+
+	stamp, err := os.ReadFile(filepath.Join(fixture, "hook-stamp.txt"))
+	if err != nil {
+		t.Fatalf("second hook did not run (hook-stamp.txt missing): %v", err)
+	}
+	if !strings.Contains(string(stamp), "SECOND_HOOK_ARG=second-hook") {
+		t.Errorf("second hook did not receive argv arg: %q", stamp)
+	}
+}
+
+func TestBuild_PostBuildHookFailureFailsBuild(t *testing.T) {
+	requirePHP(t)
+	defaults := defaultsDir(t)
+	bin := buildBinary(t)
+	fixture := prepareFixture(t, "hooks-site")
+
+	// Replace the first hook with a failing one.
+	failing := filepath.Join(fixture, "scripts", "touch-marker.sh")
+	if err := os.WriteFile(failing, []byte("#!/usr/bin/env bash\nexit 17\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := exec.Command(bin, "build", "--dir", fixture)
+	cmd.Env = append(os.Environ(), "LEAF_DEFAULTS_DIR="+defaults)
+	out, _ := cmd.CombinedOutput()
+	if cmd.ProcessState.ExitCode() == 0 {
+		t.Fatalf("expected non-zero exit when hook fails; got 0\n%s", out)
+	}
+	if !strings.Contains(string(out), "exited 17") {
+		t.Errorf("expected hook exit code in output; got:\n%s", out)
+	}
+	// Second hook must not run after the first failed.
+	if _, err := os.Stat(filepath.Join(fixture, "hook-stamp.txt")); err == nil {
+		t.Errorf("second hook ran despite first hook failing")
+	}
+}
+
 func TestBuild_CustomPages(t *testing.T) {
 	requirePHP(t)
 	defaults := defaultsDir(t)

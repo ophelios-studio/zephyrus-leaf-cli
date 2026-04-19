@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/ophelios-studio/zephyrus-leaf-cli/internal/overlay"
@@ -73,7 +74,11 @@ func Build(ctx context.Context, opts Options) (int, error) {
 	if runner == nil {
 		runner = runtime.Default()
 	}
-	code, err := runner.Run(ctx, entry, nil, workdir, nil)
+	// Binary tier drives hooks itself (post-publish, cwd = real project).
+	// Tell leaf-core to skip PHP-side hook execution.
+	code, err := runner.Run(ctx, entry, nil, workdir, map[string]string{
+		"LEAF_SKIP_HOOKS": "1",
+	})
 	if err != nil {
 		return 0, fmt.Errorf("php: %w", err)
 	}
@@ -86,7 +91,44 @@ func Build(ctx context.Context, opts Options) (int, error) {
 	if err := replaceDir(distDst, distSrc); err != nil {
 		return 0, fmt.Errorf("publish dist: %w", err)
 	}
+
+	// Run config-declared post_build hooks after dist/ is in place. Hooks
+	// run with cwd = the user's real project root (not the tempdir) so
+	// anything they produce is reachable and persistent.
+	if err := runPostBuildHooks(ctx, opts.ProjectRoot, cfg.NormalizeHooks()); err != nil {
+		return 1, err
+	}
+
 	return 0, nil
+}
+
+// runPostBuildHooks executes each hook in order. Stdout/stderr inherit the
+// parent's, so hook output streams live. First non-zero exit aborts the chain.
+func runPostBuildHooks(ctx context.Context, projectRoot string, hooks []project.Hook) error {
+	if len(hooks) == 0 {
+		return nil
+	}
+	fmt.Fprintln(os.Stdout)
+	fmt.Fprintln(os.Stdout, "Running post_build hooks...")
+	for _, hook := range hooks {
+		if len(hook.Argv) == 0 {
+			continue
+		}
+		fmt.Fprintf(os.Stdout, "  -> %v\n", hook.Argv)
+		cmd := exec.CommandContext(ctx, hook.Argv[0], hook.Argv[1:]...)
+		cmd.Dir = projectRoot
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		cmd.Stdin = os.Stdin
+		if err := cmd.Run(); err != nil {
+			var exitErr *exec.ExitError
+			if errors.As(err, &exitErr) {
+				return fmt.Errorf("hook %v exited %d", hook.Argv, exitErr.ExitCode())
+			}
+			return fmt.Errorf("hook %v: %w", hook.Argv, err)
+		}
+	}
+	return nil
 }
 
 func replaceDir(dst, src string) error {

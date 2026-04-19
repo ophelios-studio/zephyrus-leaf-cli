@@ -25,6 +25,55 @@ type Config struct {
 	BaseURL       string            `yaml:"base_url"`
 	ProductionURL string            `yaml:"production_url"`
 	Sections      map[string]string `yaml:"sections"`
+	// PostBuild holds hooks declared under `leaf.post_build`. Each entry is
+	// parsed raw (either a string or a YAML sequence). Normalize with
+	// NormalizeHooks before exec.
+	PostBuild []any `yaml:"post_build"`
+}
+
+// Hook is a parsed post_build entry: the first element is the executable
+// path (relative to the project root), remaining elements are argv.
+type Hook struct {
+	Argv []string
+}
+
+// NormalizeHooks turns the raw YAML values into a predictable list of Hook
+// structs. Strings become single-element argv; sequences become their
+// stringified contents. Empty entries are dropped.
+func (c *Config) NormalizeHooks() []Hook {
+	out := make([]Hook, 0, len(c.PostBuild))
+	for _, entry := range c.PostBuild {
+		switch v := entry.(type) {
+		case string:
+			if v != "" {
+				out = append(out, Hook{Argv: []string{v}})
+			}
+		case []any:
+			argv := make([]string, 0, len(v))
+			for _, part := range v {
+				s := stringifyScalar(part)
+				if s != "" {
+					argv = append(argv, s)
+				}
+			}
+			if len(argv) > 0 {
+				out = append(out, Hook{Argv: argv})
+			}
+		}
+	}
+	return out
+}
+
+func stringifyScalar(v any) string {
+	switch x := v.(type) {
+	case string:
+		return x
+	case int, int64, float64, bool:
+		return fmt.Sprintf("%v", x)
+	case nil:
+		return ""
+	}
+	return ""
 }
 
 type yamlRoot struct {
