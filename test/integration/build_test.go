@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -46,6 +47,9 @@ func buildBinary(t *testing.T) string {
 	repoRoot, _ := filepath.Abs(filepath.Join("..", ".."))
 	tmp := t.TempDir()
 	out := filepath.Join(tmp, "leaf")
+	if runtime.GOOS == "windows" {
+		out += ".exe"
+	}
 	cmd := exec.Command("go", "build", "-o", out, "./cmd/leaf")
 	cmd.Dir = repoRoot
 	cmd.Stdout = os.Stdout
