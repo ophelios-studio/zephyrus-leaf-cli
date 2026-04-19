@@ -5,18 +5,91 @@ on:
     tags:
       - 'v*'
 
-# Skeleton. Real pipeline will:
-#   - matrix across darwin-arm64/darwin-amd64/linux-arm64/linux-amd64/windows-amd64
-#   - build phar from pinned leaf-core tag
-#   - cross-compile via FrankenPHP static build
-#   - sign macOS binaries
-#   - generate checksums
-#   - publish GitHub Release with artifacts
+# Until M5 wires FrankenPHP, the binary is pure Go (CGO disabled). That lets
+# a single Linux runner cross-compile for every target. When we add the
+# FrankenPHP static SAPI we'll switch to per-platform runners.
 
 jobs:
-  release:
+  build:
+    name: Build and release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
     steps:
-      - uses: actions/checkout@v4
-      - name: Placeholder
-        run: echo "release pipeline not yet implemented"
+      - name: Checkout CLI
+        uses: actions/checkout@v4
+        with:
+          path: zephyrus-leaf-cli
+
+      - name: Checkout zephyrus2
+        uses: actions/checkout@v4
+        with:
+          repository: zephyrus-framework/core
+          path: zephyrus2
+
+      - name: Checkout zephyrus-leaf-core
+        uses: actions/checkout@v4
+        with:
+          repository: ophelios-studio/zephyrus-leaf-core
+          path: zephyrus-leaf-core
+
+      - name: Checkout zephyrus-leaf
+        uses: actions/checkout@v4
+        with:
+          repository: ophelios-studio/zephyrus-leaf
+          path: zephyrus-leaf
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, intl
+          tools: composer:v2
+
+      - name: Composer install (template)
+        working-directory: zephyrus-leaf
+        run: composer install --no-progress --no-interaction --no-dev
+
+      - name: Stage defaults
+        working-directory: zephyrus-leaf-cli
+        run: go run ./scripts/stage -src "$GITHUB_WORKSPACE/zephyrus-leaf"
+
+      - name: Cross-compile all targets
+        working-directory: zephyrus-leaf-cli
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          VERSION="${GITHUB_REF_NAME}"
+          LDFLAGS="-s -w -X main.version=${VERSION}"
+
+          build_one() {
+            local goos=$1 goarch=$2 ext=${3:-}
+            local name="leaf-${goos}-${goarch}${ext}"
+            echo "Building ${name}"
+            GOOS=$goos GOARCH=$goarch CGO_ENABLED=0 \
+              go build -tags embed_defaults -ldflags "${LDFLAGS}" \
+              -o "artifacts/${name}" ./cmd/leaf
+            (cd artifacts && sha256sum "${name}" >> "checksums.txt")
+          }
+
+          : > artifacts/checksums.txt
+          build_one darwin  arm64
+          build_one darwin  amd64
+          build_one linux   arm64
+          build_one linux   amd64
+          build_one windows amd64 .exe
+
+          ls -lh artifacts/
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            zephyrus-leaf-cli/artifacts/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true
