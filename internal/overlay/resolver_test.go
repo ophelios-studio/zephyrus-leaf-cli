@@ -108,6 +108,37 @@ func TestMerge_MissingUserDirIsNotError(t *testing.T) {
 	t.Logf("missing user dir surfaced as error (acceptable): %v", err)
 }
 
+func TestMerge_Skip(t *testing.T) {
+	defaults := fstest.MapFS{
+		"content/getting-started/intro.md": {Data: []byte("DEFAULT INTRO")},
+		"templates/docs.latte":             {Data: []byte("D")},
+	}
+	userDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(userDir, "content", "api"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(userDir, "content", "api", "ref.md"), []byte("USER REF"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dst := t.TempDir()
+	err := Merge(dst, []Source{
+		{Name: "defaults", Priority: 0, FS: defaults, Skip: []string{"content"}},
+		{Name: "user", Priority: 10, Root: userDir},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dst, "content", "getting-started", "intro.md")); err == nil {
+		t.Errorf("default content/ leaked through Skip")
+	}
+	if got := readFile(t, filepath.Join(dst, "content", "api", "ref.md")); got != "USER REF" {
+		t.Errorf("user content lost: %q", got)
+	}
+	if got := readFile(t, filepath.Join(dst, "templates", "docs.latte")); got != "D" {
+		t.Errorf("non-skipped default dropped: %q", got)
+	}
+}
+
 func TestMerge_NestedDirectories(t *testing.T) {
 	defaults := fstest.MapFS{
 		"a/b/c/d.txt": {Data: []byte("deep")},

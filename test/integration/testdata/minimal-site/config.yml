@@ -1,0 +1,10 @@
+leaf:
+  name: "Integration Test Site"
+  version: "0.1.0"
+  description: "Minimal fixture for leaf build integration test."
+  content_path: "content"
+  output_path: "dist"
+  base_url: ""
+  production_url: "https://example.test"
+  sections:
+    guide: "Guide"
