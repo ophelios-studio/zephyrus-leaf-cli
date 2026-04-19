@@ -15,25 +15,37 @@ import (
 // scaffold. Anything PHP-glue, vendored, or build-only is excluded so the
 // user's new project only contains files they're meant to author.
 var initSkip = []string{
+	// Framework plumbing (PHP tier, hidden from CLI users)
 	"app",
 	"bin",
 	"vendor",
+	"src",
 	"composer.json",
 	"composer.lock",
-	"docker-compose.yml",
+	"phpunit.xml",
+	"tests",
+	"public/index.php",
+	"public/router.php",
+	// Build output and caches
 	"dist",
 	"cache",
-	".git",
-	".github",
-	".gitignore",
-	".DS_Store",
+	"locale",
+	// Project-meta / dev-only files from the source template
+	"docker-compose.yml",
 	"CLAUDE.md",
 	"README.md",
 	"LICENSE",
-	"phpunit.xml",
-	"tests",
-	"src",
-	"locale",
+	".codequill",
+	// Git & tooling metadata
+	".git",
+	".github",
+	".gitignore",
+	".gitattributes",
+	".editorconfig",
+	// OS / staging markers
+	".DS_Store",
+	".staged",
+	".gitkeep",
 }
 
 func runInit(args []string) int {
@@ -81,7 +93,7 @@ func runInit(args []string) int {
 	fmt.Fprintln(os.Stdout, "")
 	fmt.Fprintln(os.Stdout, "Next:")
 	fmt.Fprintf(os.Stdout, "  cd %s\n", name)
-	fmt.Fprintln(os.Stdout, "  leaf build")
+	fmt.Fprintln(os.Stdout, "  leaf dev     # live preview at http://localhost:8080")
 	return 0
 }
 

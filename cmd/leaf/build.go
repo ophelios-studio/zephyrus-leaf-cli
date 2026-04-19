@@ -40,13 +40,19 @@ func runBuild(args []string) int {
 	return code
 }
 
+// signalContext returns a context cancelled on SIGINT/SIGTERM. The first
+// signal triggers graceful shutdown. A second signal hard-exits with 130 so
+// the user never has to kill -9 if cleanup hangs.
 func signalContext() (context.Context, context.CancelFunc) {
 	ctx, cancel := context.WithCancel(context.Background())
-	c := make(chan os.Signal, 1)
+	c := make(chan os.Signal, 2)
 	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		<-c
 		cancel()
+		<-c
+		fmt.Fprintln(os.Stderr, "\nleaf: forced exit")
+		os.Exit(130)
 	}()
 	return ctx, cancel
 }

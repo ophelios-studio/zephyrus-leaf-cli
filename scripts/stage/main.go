@@ -18,14 +18,16 @@ import (
 // skipPrefix returns true if rel (forward-slash-separated relative path)
 // matches a path we should not include in the embedded framework.
 func skipPrefix(rel string) bool {
+	// Skip every top-level dotfile / dotdir. Catches .git, .github,
+	// .codequill, .idea, .vscode, .DS_Store, etc. without enumerating.
+	if len(rel) > 0 && rel[0] == '.' {
+		return true
+	}
+
 	// Top-level dirs/files excluded entirely.
 	topExact := map[string]bool{
 		"dist":              true,
 		"cache":             true,
-		".git":              true,
-		".github":           true,
-		".idea":             true,
-		".vscode":           true,
 		"node_modules":      true,
 		"docker-compose.yml": true,
 		"CLAUDE.md":         true,
@@ -96,15 +98,10 @@ func main() {
 		fatal(err)
 	}
 
-	// Preserve any top-level marker files we own (like .gitkeep).
+	// Preserve our own tracked marker so go:embed has a predictable entrypoint.
 	keep := map[string][]byte{}
-	entries, _ := os.ReadDir(dstAbs)
-	for _, e := range entries {
-		if strings.HasPrefix(e.Name(), ".") {
-			if b, err := os.ReadFile(filepath.Join(dstAbs, e.Name())); err == nil {
-				keep[e.Name()] = b
-			}
-		}
+	if b, err := os.ReadFile(filepath.Join(dstAbs, ".gitkeep")); err == nil {
+		keep[".gitkeep"] = b
 	}
 
 	if err := os.RemoveAll(dstAbs); err != nil {

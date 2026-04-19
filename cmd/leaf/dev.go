@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/ophelios-studio/zephyrus-leaf-cli/internal/builder"
@@ -57,11 +58,15 @@ func runDev(args []string) int {
 		return 1
 	}
 
-	go func() {
-		_ = httpSrv.Serve(ln)
-	}()
+	serveErr := make(chan error, 1)
+	go func() { serveErr <- httpSrv.Serve(ln) }()
 
-	fmt.Fprintf(os.Stdout, "leaf dev: serving %s at http://%s\n", root, ln.Addr().String())
+	fmt.Fprintln(os.Stdout)
+	fmt.Fprintf(os.Stdout, "  leaf dev ready\n")
+	fmt.Fprintf(os.Stdout, "  \u279C %s\n", friendlyURL(ln.Addr().String()))
+	fmt.Fprintf(os.Stdout, "  Watching %s\n", root)
+	fmt.Fprintf(os.Stdout, "  Press Ctrl+C to stop\n")
+	fmt.Fprintln(os.Stdout)
 
 	watcher, err := devserver.NewWatcher(root, 250*time.Millisecond)
 	if err != nil {
@@ -76,7 +81,13 @@ func runDev(args []string) int {
 	for {
 		select {
 		case <-ctx.Done():
-			_ = httpSrv.Shutdown(context.Background())
+			fmt.Fprintln(os.Stdout, "\nleaf dev: shutting down...")
+			shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer shutdownCancel()
+			if err := httpSrv.Shutdown(shutdownCtx); err != nil {
+				// SSE streams don't close on graceful shutdown. Force-close.
+				_ = httpSrv.Close()
+			}
 			return 0
 		case <-watcher.Events():
 			fmt.Fprintln(os.Stdout, "leaf dev: change detected, rebuilding...")
@@ -90,4 +101,19 @@ func runDev(args []string) int {
 			hub.Broadcast("reload")
 		}
 	}
+}
+
+// friendlyURL rewrites a net.Listen address so wildcard binds read as
+// "localhost" instead of "[::]" or "0.0.0.0", which users never remember.
+func friendlyURL(addr string) string {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return "http://" + addr
+	}
+	if host == "" || host == "::" || host == "[::]" || host == "0.0.0.0" {
+		host = "localhost"
+	} else if strings.HasPrefix(addr, "[::]:") {
+		host = "localhost"
+	}
+	return "http://" + net.JoinHostPort(host, port)
 }
