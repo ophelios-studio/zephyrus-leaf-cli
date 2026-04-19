@@ -29,7 +29,6 @@ var initSkip = []string{
 	// Build output and caches
 	"dist",
 	"cache",
-	"locale",
 	// Project-meta / dev-only files from the source template
 	"docker-compose.yml",
 	"CLAUDE.md",
