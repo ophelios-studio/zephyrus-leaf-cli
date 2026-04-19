@@ -83,7 +83,7 @@ Repo structure, README, LICENSE, .gitignore, placeholder main.go, placeholder sc
 | `test/integration/testdata/minimal-site/` | New fixture |
 | `test/integration/testdata/override-site/` | New fixture |
 
-### M2 — `leaf init` with embedded scaffolds
+### M2 — `leaf init` with embedded scaffolds ✅ (dev-mode scaffold source; release-mode go:embed deferred to M5)
 
 **Deliverable**: `leaf init my-site --template=docs-only|docs-landing|bare` creates a working project.
 

@@ -28,8 +28,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "leaf dev: not yet implemented (M3)")
 		os.Exit(1)
 	case "init":
-		fmt.Fprintln(os.Stderr, "leaf init: not yet implemented (M2)")
-		os.Exit(1)
+		os.Exit(runInit(os.Args[2:]))
 	case "eject":
 		fmt.Fprintln(os.Stderr, "leaf eject: not yet implemented (M4)")
 		os.Exit(1)
@@ -47,7 +46,7 @@ Usage:
     leaf <command> [flags]
 
 Commands:
-    init [name]    Scaffold a new site
+    init <name>    Scaffold a new site
     dev            Serve with live reload
     build          Generate static HTML into dist/
     eject          Convert to the full Composer project path

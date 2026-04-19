@@ -86,6 +86,72 @@ func copyDir(src, dst string) error {
 	})
 }
 
+func TestInit_ThenBuild(t *testing.T) {
+	requirePHP(t)
+	defaults := defaultsDir(t)
+	bin := buildBinary(t)
+
+	parent := t.TempDir()
+	target := filepath.Join(parent, "my-site")
+
+	initCmd := exec.Command(bin, "init", target)
+	initCmd.Env = append(os.Environ(), "LEAF_DEFAULTS_DIR="+defaults)
+	if out, err := initCmd.CombinedOutput(); err != nil {
+		t.Fatalf("leaf init failed: %v\n%s", err, out)
+	}
+
+	// Framework internals must not leak into the scaffold.
+	for _, forbidden := range []string{"app", "bin", "vendor", "composer.json", "docker-compose.yml"} {
+		if _, err := os.Stat(filepath.Join(target, forbidden)); err == nil {
+			t.Errorf("init leaked framework file: %s", forbidden)
+		}
+	}
+	// User-facing files must be present.
+	for _, required := range []string{"content", "config.yml"} {
+		if _, err := os.Stat(filepath.Join(target, required)); err != nil {
+			t.Errorf("init missing user file: %s (%v)", required, err)
+		}
+	}
+
+	// A build against the scaffolded site must succeed out of the box.
+	buildCmd := exec.Command(bin, "build", "--dir", target)
+	buildCmd.Env = append(os.Environ(), "LEAF_DEFAULTS_DIR="+defaults)
+	if out, err := buildCmd.CombinedOutput(); err != nil {
+		t.Fatalf("post-init build failed: %v\n%s", err, out)
+	}
+	if _, err := os.Stat(filepath.Join(target, "dist")); err != nil {
+		t.Errorf("post-init build did not produce dist: %v", err)
+	}
+}
+
+func TestInit_RefusesNonEmpty(t *testing.T) {
+	defaults := defaultsDir(t)
+	bin := buildBinary(t)
+
+	parent := t.TempDir()
+	target := filepath.Join(parent, "busy")
+	if err := os.MkdirAll(target, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(target, "x.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	initCmd := exec.Command(bin, "init", target)
+	initCmd.Env = append(os.Environ(), "LEAF_DEFAULTS_DIR="+defaults)
+	out, err := initCmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected error for non-empty target; got output:\n%s", out)
+	}
+
+	// --force allows it.
+	forceCmd := exec.Command(bin, "init", "--force", target)
+	forceCmd.Env = append(os.Environ(), "LEAF_DEFAULTS_DIR="+defaults)
+	if out, err := forceCmd.CombinedOutput(); err != nil {
+		t.Fatalf("--force init failed: %v\n%s", err, out)
+	}
+}
+
 func TestBuild_TemplateOverride(t *testing.T) {
 	requirePHP(t)
 	defaults := defaultsDir(t)
