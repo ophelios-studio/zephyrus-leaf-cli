@@ -59,13 +59,25 @@ func runBuild(args []string) int {
 	}
 
 	// content/ and config.yml are user-owned. Defaults ship starter copies
-	// for `leaf init`; they must not bleed into a build.
+	// for `leaf init`; they must not bleed into a build. User's templates/
+	// is handled separately so it lands where PHP expects (app/Views/).
 	if err := overlay.Merge(workdir, []overlay.Source{
 		{Name: "defaults", Priority: 0, FS: defaults.FS, Root: defaults.Root, Skip: []string{"content", "config.yml", "dist", "cache", ".git"}},
-		{Name: "user", Priority: 10, Root: root, Skip: []string{"dist"}},
+		{Name: "user", Priority: 10, Root: root, Skip: []string{"dist", "templates"}},
 	}); err != nil {
 		fmt.Fprintf(os.Stderr, "leaf build: merge project: %v\n", err)
 		return 1
+	}
+
+	// User templates/ → workdir/app/Views/, overriding bundled defaults.
+	userTemplates := filepath.Join(root, "templates")
+	if _, err := os.Stat(userTemplates); err == nil {
+		if err := overlay.Merge(filepath.Join(workdir, "app", "Views"), []overlay.Source{
+			{Name: "user-templates", Root: userTemplates},
+		}); err != nil {
+			fmt.Fprintf(os.Stderr, "leaf build: merge templates: %v\n", err)
+			return 1
+		}
 	}
 
 	entry := filepath.Join(workdir, "bin", "build.php")

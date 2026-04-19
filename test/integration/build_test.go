@@ -86,6 +86,31 @@ func copyDir(src, dst string) error {
 	})
 }
 
+func TestBuild_TemplateOverride(t *testing.T) {
+	requirePHP(t)
+	defaults := defaultsDir(t)
+	bin := buildBinary(t)
+	fixture := prepareFixture(t, "override-site")
+
+	cmd := exec.Command(bin, "build", "--dir", fixture)
+	cmd.Env = append(os.Environ(), "LEAF_DEFAULTS_DIR="+defaults)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("leaf build failed: %v\n%s", err, out)
+	}
+	t.Logf("build output:\n%s", out)
+
+	pagePath := filepath.Join(fixture, "dist", "guide", "page", "index.html")
+	data, err := os.ReadFile(pagePath)
+	if err != nil {
+		t.Fatalf("expected built page missing: %v", err)
+	}
+	body := string(data)
+	if !strings.Contains(body, "CUSTOM_NAV_MARKER_42") {
+		t.Errorf("template override did not win; marker absent from %s", pagePath)
+	}
+}
+
 func TestBuild_Minimal(t *testing.T) {
 	requirePHP(t)
 	defaults := defaultsDir(t)

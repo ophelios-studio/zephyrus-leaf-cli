@@ -39,7 +39,7 @@ Each milestone is independently mergeable. Tests ship **with** the milestone the
 
 Repo structure, README, LICENSE, .gitignore, placeholder main.go, placeholder scripts. Already live at https://github.com/ophelios-studio/zephyrus-leaf-cli (private).
 
-### M1 — `leaf build` end-to-end
+### M1 — `leaf build` end-to-end ✅ (core path working; phar packaging deferred to M5)
 
 **Deliverable**: `./leaf build` in a directory with `content/` and `config.yml` produces `dist/` HTML. No init, no dev, no release polish yet.
 

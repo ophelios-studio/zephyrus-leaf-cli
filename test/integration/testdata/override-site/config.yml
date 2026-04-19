@@ -1,0 +1,9 @@
+leaf:
+  name: "Override Test Site"
+  version: "0.1.0"
+  description: "Fixture that overrides a partial to prove templates/ wins."
+  content_path: "content"
+  output_path: "dist"
+  production_url: "https://example.test"
+  sections:
+    guide: "Guide"
