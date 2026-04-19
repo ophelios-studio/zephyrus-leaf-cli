@@ -90,6 +90,50 @@ func copyDir(src, dst string) error {
 	})
 }
 
+// TestBuild_Standalone exercises the embed_defaults path: binary built with
+// the framework baked in, LEAF_DEFAULTS_DIR unset, init + build should still
+// succeed. Skips when the local environment can't compile with that tag
+// (no staged framework tree).
+func TestBuild_Standalone(t *testing.T) {
+	requirePHP(t)
+	repoRoot, _ := filepath.Abs(filepath.Join("..", ".."))
+	markerPath := filepath.Join(repoRoot, "internal", "project", "framework", "composer.json")
+	if _, err := os.Stat(markerPath); err != nil {
+		t.Skip("framework not staged; run 'go run ./scripts/stage -src <zephyrus-leaf>' first")
+	}
+
+	tmp := t.TempDir()
+	out := filepath.Join(tmp, "leaf")
+	if runtime.GOOS == "windows" {
+		out += ".exe"
+	}
+	build := exec.Command("go", "build", "-tags", "embed_defaults", "-o", out, "./cmd/leaf")
+	build.Dir = repoRoot
+	build.Stdout = os.Stdout
+	build.Stderr = os.Stderr
+	if err := build.Run(); err != nil {
+		t.Fatalf("go build -tags embed_defaults: %v", err)
+	}
+
+	target := filepath.Join(tmp, "mysite")
+	// Deliberately empty environment except PATH (LEAF_DEFAULTS_DIR MUST NOT be set).
+	clean := []string{"PATH=" + os.Getenv("PATH")}
+
+	initCmd := exec.Command(out, "init", target)
+	initCmd.Env = clean
+	if out, err := initCmd.CombinedOutput(); err != nil {
+		t.Fatalf("standalone init: %v\n%s", err, out)
+	}
+	buildCmd := exec.Command(out, "build", "--dir", target)
+	buildCmd.Env = clean
+	if out, err := buildCmd.CombinedOutput(); err != nil {
+		t.Fatalf("standalone build: %v\n%s", err, out)
+	}
+	if _, err := os.Stat(filepath.Join(target, "dist", "getting-started", "introduction", "index.html")); err != nil {
+		t.Errorf("expected dist page missing: %v", err)
+	}
+}
+
 func TestEject_RestoresFramework(t *testing.T) {
 	defaults := defaultsDir(t)
 	bin := buildBinary(t)
