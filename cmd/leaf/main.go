@@ -1,10 +1,7 @@
 // Leaf CLI entry point.
 //
-// This is a skeleton. The real implementation will embed FrankenPHP and the
-// bundled leaf-core phar, dispatch to subcommands (init, dev, build, eject),
-// and overlay the user's project directory on top of the embedded defaults.
-//
-// See README.md for the design.
+// Dispatches subcommands. Actual logic lives under internal/. Keep this file
+// thin; it should only route flags to the right package.
 package main
 
 import (
@@ -16,7 +13,7 @@ const version = "0.0.0-dev"
 
 func main() {
 	if len(os.Args) < 2 {
-		usage()
+		usage(os.Stderr)
 		os.Exit(2)
 	}
 
@@ -24,19 +21,27 @@ func main() {
 	case "version", "-v", "--version":
 		fmt.Println("leaf", version)
 	case "help", "-h", "--help":
-		usage()
-	case "init", "dev", "build", "eject":
-		fmt.Fprintf(os.Stderr, "leaf %s: not yet implemented\n", os.Args[1])
+		usage(os.Stdout)
+	case "build":
+		os.Exit(runBuild(os.Args[2:]))
+	case "dev":
+		fmt.Fprintln(os.Stderr, "leaf dev: not yet implemented (M3)")
+		os.Exit(1)
+	case "init":
+		fmt.Fprintln(os.Stderr, "leaf init: not yet implemented (M2)")
+		os.Exit(1)
+	case "eject":
+		fmt.Fprintln(os.Stderr, "leaf eject: not yet implemented (M4)")
 		os.Exit(1)
 	default:
 		fmt.Fprintf(os.Stderr, "leaf: unknown command %q\n", os.Args[1])
-		usage()
+		usage(os.Stderr)
 		os.Exit(2)
 	}
 }
 
-func usage() {
-	fmt.Fprintln(os.Stderr, `leaf - a zero-dependency static site CLI
+func usage(w *os.File) {
+	fmt.Fprintln(w, `leaf - a zero-dependency static site CLI
 
 Usage:
     leaf <command> [flags]
