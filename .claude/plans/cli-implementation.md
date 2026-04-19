@@ -172,7 +172,7 @@ Repo structure, README, LICENSE, .gitignore, placeholder main.go, placeholder sc
 | `internal/embed/addendum/` | New (generated from zephyrus-leaf at the same pinned tag) |
 | `test/integration/eject_test.go` | New |
 
-### M5 — Release pipeline + install script
+### M5 — Release pipeline + install script 🟡 (standalone embed + 5-target cross-compile done; FrankenPHP static link still pending)
 
 **Deliverable**: tagging `v1.0.0` produces signed per-platform binaries + a GitHub Release. Install script live at `leaf.ophelios.com/install.sh`.
 

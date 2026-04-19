@@ -8,18 +8,27 @@ The shipping goal: no PHP, no Composer, no Docker on the user's machine. One sel
 
 ## Status
 
-Subcommands working in **dev mode** (requires system PHP + a local framework checkout via `LEAF_DEFAULTS_DIR`):
+All four subcommands working, two build modes, release pipeline in place:
 
 - `leaf init <name>` — scaffold a new site
 - `leaf build` — render Markdown + Latte to static HTML
 - `leaf dev` — live-reload server with file watcher and SSE-based reload
 - `leaf eject` — convert binary-tier project into the Composer-tier
 
+Build modes:
+
+- **Standalone** (`-tags embed_defaults`): framework baked into the binary. Single ~13 MB executable per platform. Still needs system PHP at runtime (FrankenPHP static link is the final step).
+- **Dev** (default): framework resolved from `LEAF_DEFAULTS_DIR`. For hacking on the CLI itself.
+
+Releases:
+
+- CI: Unit + embed build + integration on Ubuntu, macOS, Windows on every push.
+- Release workflow: tag `v*` → cross-compiles 5 targets → publishes GitHub Release with checksums.
+- Install script: [`scripts/install.sh`](scripts/install.sh), hosted at `leaf.ophelios.com/install.sh` (pending docs site deploy).
+
 Not yet shipped:
 
-- **Standalone binary**: FrankenPHP static link + cross-compile matrix (macOS arm64/amd64, Linux arm64/amd64, Windows amd64). The Go code is ready; the CI pipeline and embedded phar are M5.
-- Install script at `leaf.ophelios.com/install.sh`
-- Released binaries for download
+- FrankenPHP static link (M5 final step), so users don't need system PHP.
 
 ## Install (planned)
 
