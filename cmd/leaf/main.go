@@ -25,8 +25,7 @@ func main() {
 	case "build":
 		os.Exit(runBuild(os.Args[2:]))
 	case "dev":
-		fmt.Fprintln(os.Stderr, "leaf dev: not yet implemented (M3)")
-		os.Exit(1)
+		os.Exit(runDev(os.Args[2:]))
 	case "init":
 		os.Exit(runInit(os.Args[2:]))
 	case "eject":

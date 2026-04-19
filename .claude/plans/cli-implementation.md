@@ -118,7 +118,7 @@ Repo structure, README, LICENSE, .gitignore, placeholder main.go, placeholder sc
 | `scripts/build-scaffolds.sh` | Real implementation |
 | `test/integration/init_test.go` | New |
 
-### M3 — `leaf dev` with live reload
+### M3 — `leaf dev` with live reload ✅ (SSE instead of WebSocket, 12 devserver unit tests green)
 
 **Deliverable**: `leaf dev` in a project dir starts a server on `:8080`, rebuilds on file change, browser auto-reloads.
 
