@@ -1,3 +1,6 @@
+# Agent-private workspace (plans, markers, settings)
+/.claude/
+
 # Build output
 /bin/
 /dist/

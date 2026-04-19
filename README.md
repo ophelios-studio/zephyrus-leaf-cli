@@ -1,107 +1,106 @@
-# Leaf
+# Leaf CLI
 
-A zero-dependency static site CLI.
+A zero-dependency static site CLI. Write Markdown. Optionally templates in Latte, PHP, or plain HTML. Run `leaf build`. Deploy anywhere static.
 
-Write Markdown. Optionally a landing in Latte, PHP, or HTML. Run `leaf build`. Deploy anywhere static.
+One binary per platform. No PHP or Composer to install on your machine at install time. (The binary currently shells out to system `php` at build time; FrankenPHP static link to remove that is on the roadmap.)
 
-The shipping goal: no PHP, no Composer, no Docker on the user's machine. One self-contained binary per platform.
-
-## Status
-
-All four subcommands working, two build modes, release pipeline in place:
-
-- `leaf init <name>` — scaffold a new site
-- `leaf build` — render Markdown + Latte to static HTML
-- `leaf dev` — live-reload server with file watcher and SSE-based reload
-- `leaf eject` — convert binary-tier project into the Composer-tier
-
-Build modes:
-
-- **Standalone** (`-tags embed_defaults`): framework baked into the binary. Single ~13 MB executable per platform. Still needs system PHP at runtime (FrankenPHP static link is the final step).
-- **Dev** (default): framework resolved from `LEAF_DEFAULTS_DIR`. For hacking on the CLI itself.
-
-Releases:
-
-- CI: Unit + embed build + integration on Ubuntu, macOS, Windows on every push.
-- Release workflow: tag `v*` → cross-compiles 5 targets → publishes GitHub Release with checksums.
-- Install script: [`scripts/install.sh`](scripts/install.sh), hosted at `leaf.ophelios.com/install.sh` (pending docs site deploy).
-
-Not yet shipped:
-
-- FrankenPHP static link (M5 final step), so users don't need system PHP.
-
-## Install (planned)
+## Install
 
 ```sh
 curl -fsSL https://leaf.ophelios.com/install.sh | sh
 ```
 
-## Quickstart (dev mode, today)
+Detects your OS/arch, downloads the matching binary from [GitHub Releases](https://github.com/ophelios-studio/zephyrus-leaf-cli/releases/latest), verifies the checksum, installs to `/usr/local/bin/leaf`. Override with `LEAF_PREFIX` or `LEAF_VERSION`.
+
+Supported platforms: macOS (arm64, amd64), Linux (arm64, amd64), Windows (amd64).
+
+## Quickstart
 
 ```sh
-git clone https://github.com/ophelios-studio/zephyrus-leaf-cli
-cd zephyrus-leaf-cli
-go build -o bin/leaf ./cmd/leaf
-
-# Point the binary at a local zephyrus-leaf checkout (with vendor installed).
-export LEAF_DEFAULTS_DIR=/path/to/zephyrus-leaf
-
-./bin/leaf init my-docs
+leaf init my-docs
 cd my-docs
-../bin/leaf dev            # serves at http://localhost:8080 with live reload
-../bin/leaf build          # writes dist/
+leaf dev       # live preview on http://localhost:8080
+leaf build     # writes dist/, ready to deploy
 ```
 
-## Project structure (what users see)
+## Commands
+
+```
+leaf init <name>  Scaffold a new site
+leaf dev          Serve with live reload
+leaf build        Generate static HTML into dist/
+leaf eject        Convert to the Composer project path (one-way)
+leaf version
+leaf help
+```
+
+Full reference: [leaf.ophelios.com/getting-started/cli-reference](https://leaf.ophelios.com/getting-started/cli-reference).
+
+## Project structure
+
+After `leaf init`:
 
 ```
 my-site/
-├── content/           # markdown docs, sections, pages
-├── templates/         # optional: Latte/PHP/HTML overrides
-├── public/            # static assets copied verbatim
-├── config.yml         # site config
-└── dist/              # build output (gitignored)
+├── content/     # markdown pages, organized by section
+├── templates/   # optional Latte/PHP/HTML overrides (add as needed)
+├── public/      # static assets copied verbatim
+├── locale/      # optional translation JSON files
+├── config.yml   # site configuration
+└── dist/        # build output (gitignore this)
 ```
 
-No `app/`, no `vendor/`, no `Kernel.php`. The framework lives inside the binary.
+No `app/`, `bin/`, `vendor/`, or `composer.json`. The framework lives inside the binary.
 
 ## Templating
 
-- `templates/layouts/docs.latte` overrides the bundled docs layout.
-- `templates/partials/nav.latte` overrides the bundled nav. Any path under `templates/` maps to `app/Views/<same path>` inside the build.
-- Landing page: drop a `templates/landing.latte` (or `.php`, or `.html`). If present, it renders at `/`. If absent, `/` redirects to the first doc page.
+Drop files under `templates/` to override the bundled theme. Paths map to `app/Views/<same path>` internally:
 
-Pick what fits. Docs theme comes from bundled defaults; override any template by placing a file at the same path.
+- `templates/layouts/docs.latte` — override the docs layout
+- `templates/partials/nav.latte` — override the site nav
+- `templates/landing.latte` — if present, renders at `/` instead of the default redirect
+- Same patterns work with `.php` and `.html` (HTML is copied through without variable interpolation)
+
+## Runtime requirement
+
+At build time `leaf` needs system PHP 8.4+ with `intl`, `mbstring`, `sodium`, and `pdo` extensions. Removing this via FrankenPHP static link is the remaining milestone before true zero-dependency.
+
+## Prefer PHP?
+
+For teams that want custom controllers, Composer packages, or full ownership of `bin/build.php`, use the Composer template instead:
+
+```sh
+composer create-project zephyrus-framework/leaf my-docs
+```
+
+Same [`zephyrus-leaf-core`](https://github.com/ophelios-studio/zephyrus-leaf-core) under the hood.
+
+Already started on the binary and want to switch? `leaf eject` converts the project (one-way).
 
 ## Architecture
 
-Every `leaf build` follows the same pipeline:
+Each `leaf build` runs:
 
 1. Load `config.yml` from the project root.
-2. Create a tempdir, overlay-merge the embedded framework defaults + the user's files into it.
-3. Invoke PHP (system `php` in dev mode, statically-linked FrankenPHP in release) against `bin/build.php` inside that tempdir.
+2. Create a tempdir, overlay-merge the embedded framework + your `content/`, `templates/`, `public/`, `config.yml` into it.
+3. Invoke PHP against `bin/build.php` inside the tempdir.
 4. Copy the rendered `dist/` back into the project root.
-5. Clean up the tempdir.
+5. Clean up.
 
-`leaf dev` does step 1-4 on every file change and broadcasts an SSE "reload" message to every connected browser.
+`leaf dev` runs the same pipeline on every file change (250 ms debounced) and pushes Server-Sent Events to open browser tabs to auto-reload.
 
-Overlay precedence: user's files win over bundled defaults. `content/` and `config.yml` are user-exclusive (defaults don't leak through). `templates/` and `public/` are file-level overrides (defaults survive where the user didn't replace).
+Overlay precedence: user files win over bundled defaults. `content/` and `config.yml` are user-exclusive (defaults don't leak through). `templates/`, `public/`, `locale/` are file-level overrides.
 
-## Want more?
+## Status
 
-For advanced use (custom controllers, Composer packages, framework extension), use the [Composer template](https://github.com/ophelios-studio/zephyrus-leaf) instead:
-
-```sh
-composer create-project dadajuice/zephyrus-leaf my-site
-```
-
-Same core (`zephyrus-leaf-core`), richer escape hatches.
-
-Or start with the binary and run `leaf eject` when you outgrow it. One-way, documented.
+- `leaf init|dev|build|eject` ship and are tested on Linux, macOS, Windows on every push
+- Pure-Go cross-compile (no CGO) produces ~13 MB binaries per platform
+- Release pipeline: tag `v*` → cross-compile all 5 targets → publish GitHub Release with `checksums.txt`
+- FrankenPHP static link (so users don't need system PHP): roadmap
 
 ## Development
 
-See [DEVELOPMENT.md](DEVELOPMENT.md).
+See [DEVELOPMENT.md](DEVELOPMENT.md) for building from source, running tests, and the release pipeline.
 
 ## License
 
