@@ -6,9 +6,11 @@
 # Embedded phar is built at release time, not committed
 /internal/embed/phar/*.phar
 
-# Staged framework tree (output of scripts/stage-defaults.sh). Regenerated
-# per-build by CI; never committed.
-/internal/project/framework/
+# Staged framework tree (output of scripts/stage). Regenerated per-build by
+# CI; never committed. The .gitkeep marker is tracked so go:embed has an
+# entrypoint in clean checkouts.
+/internal/project/framework/*
+!/internal/project/framework/.gitkeep
 
 # Go
 *.exe

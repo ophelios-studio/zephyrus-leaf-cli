@@ -1,0 +1,3 @@
+# This directory is populated by scripts/stage at build time.
+# Committed only as a marker so go:embed has something to find in a clean
+# checkout (non-embed builds work without any contents here).
