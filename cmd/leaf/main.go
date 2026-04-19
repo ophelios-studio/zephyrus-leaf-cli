@@ -29,8 +29,7 @@ func main() {
 	case "init":
 		os.Exit(runInit(os.Args[2:]))
 	case "eject":
-		fmt.Fprintln(os.Stderr, "leaf eject: not yet implemented (M4)")
-		os.Exit(1)
+		os.Exit(runEject(os.Args[2:]))
 	default:
 		fmt.Fprintf(os.Stderr, "leaf: unknown command %q\n", os.Args[1])
 		usage(os.Stderr)

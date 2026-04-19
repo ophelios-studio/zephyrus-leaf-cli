@@ -151,7 +151,7 @@ Repo structure, README, LICENSE, .gitignore, placeholder main.go, placeholder sc
 | `internal/devserver/inject_test.go` | New |
 | `test/integration/dev_test.go` | New |
 
-### M4 — `leaf eject`
+### M4 — `leaf eject` ✅
 
 **Deliverable**: `leaf eject` converts the user's binary-tier project into a Composer-tier project.
 

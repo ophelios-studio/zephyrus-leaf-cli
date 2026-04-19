@@ -86,6 +86,46 @@ func copyDir(src, dst string) error {
 	})
 }
 
+func TestEject_RestoresFramework(t *testing.T) {
+	defaults := defaultsDir(t)
+	bin := buildBinary(t)
+
+	// Start from an init'd site.
+	target := filepath.Join(t.TempDir(), "site")
+	initCmd := exec.Command(bin, "init", target)
+	initCmd.Env = append(os.Environ(), "LEAF_DEFAULTS_DIR="+defaults)
+	if out, err := initCmd.CombinedOutput(); err != nil {
+		t.Fatalf("init failed: %v\n%s", err, out)
+	}
+
+	// Eject.
+	ejectCmd := exec.Command(bin, "eject", "--dir", target)
+	ejectCmd.Env = append(os.Environ(), "LEAF_DEFAULTS_DIR="+defaults)
+	if out, err := ejectCmd.CombinedOutput(); err != nil {
+		t.Fatalf("eject failed: %v\n%s", err, out)
+	}
+
+	// Framework files must now be present.
+	for _, required := range []string{"app", "bin", "composer.json"} {
+		if _, err := os.Stat(filepath.Join(target, required)); err != nil {
+			t.Errorf("eject did not add %s: %v", required, err)
+		}
+	}
+	// User files must survive.
+	for _, keep := range []string{"content", "config.yml"} {
+		if _, err := os.Stat(filepath.Join(target, keep)); err != nil {
+			t.Errorf("eject destroyed %s: %v", keep, err)
+		}
+	}
+
+	// Second eject without --force must refuse.
+	refuse := exec.Command(bin, "eject", "--dir", target)
+	refuse.Env = append(os.Environ(), "LEAF_DEFAULTS_DIR="+defaults)
+	if out, err := refuse.CombinedOutput(); err == nil {
+		t.Fatalf("expected refuse on re-eject; got:\n%s", out)
+	}
+}
+
 func TestInit_ThenBuild(t *testing.T) {
 	requirePHP(t)
 	defaults := defaultsDir(t)
