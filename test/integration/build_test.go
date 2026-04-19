@@ -96,6 +96,75 @@ func copyDir(src, dst string) error {
 // the framework baked in, LEAF_DEFAULTS_DIR unset, init + build should still
 // succeed. Skips when the local environment can't compile with that tag
 // (no staged framework tree).
+func TestBuild_MultiLocaleContent(t *testing.T) {
+	requirePHP(t)
+	defaults := defaultsDir(t)
+	bin := buildBinary(t)
+	fixture := prepareFixture(t, "multi-locale-site")
+
+	cmd := exec.Command(bin, "build", "--dir", fixture)
+	cmd.Env = append(os.Environ(), "LEAF_DEFAULTS_DIR="+defaults)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("leaf build failed: %v\n%s", err, out)
+	}
+
+	type check struct {
+		path, marker, label string
+	}
+	cases := []check{
+		// English default
+		{"dist/getting-started/intro/index.html", "DEFAULT_INTRO_MARKER", "en intro"},
+		{"dist/getting-started/installation/index.html", "ENGLISH_ONLY_MARKER", "en installation"},
+		// French: translated intro, fallback installation, French-only section
+		{"dist/fr/getting-started/intro/index.html", "FRENCH_INTRO_MARKER", "fr intro (translated)"},
+		{"dist/fr/getting-started/installation/index.html", "ENGLISH_ONLY_MARKER", "fr installation (fallback)"},
+		{"dist/fr/concepts/overview/index.html", "FRENCH_ONLY_SECTION_MARKER", "fr-only concepts"},
+	}
+	for _, c := range cases {
+		data, err := os.ReadFile(filepath.Join(fixture, c.path))
+		if err != nil {
+			t.Errorf("[%s] missing %s: %v", c.label, c.path, err)
+			continue
+		}
+		if !strings.Contains(string(data), c.marker) {
+			t.Errorf("[%s] %s missing from %s", c.label, c.marker, c.path)
+		}
+	}
+
+	// French-only content must NOT appear in the English build.
+	if _, err := os.Stat(filepath.Join(fixture, "dist", "concepts", "overview", "index.html")); err == nil {
+		t.Errorf("French-only section leaked into the English dist")
+	}
+
+	// Per-locale search indices must exist; each locale's index surfaces
+	// its own translated content.
+	enSearch, err := os.ReadFile(filepath.Join(fixture, "dist", "search.json"))
+	if err != nil {
+		t.Fatalf("english search.json missing: %v", err)
+	}
+	if !strings.Contains(string(enSearch), "DEFAULT_INTRO_MARKER") {
+		t.Errorf("english search index doesn't contain default intro text")
+	}
+	if strings.Contains(string(enSearch), "FRENCH_INTRO_MARKER") {
+		t.Errorf("english search index leaked French content")
+	}
+
+	frSearch, err := os.ReadFile(filepath.Join(fixture, "dist", "fr", "search.json"))
+	if err != nil {
+		t.Fatalf("french search.json missing: %v", err)
+	}
+	if !strings.Contains(string(frSearch), "FRENCH_INTRO_MARKER") {
+		t.Errorf("french search index missing translated intro")
+	}
+	if !strings.Contains(string(frSearch), "FRENCH_ONLY_SECTION_MARKER") {
+		t.Errorf("french search index missing french-only section")
+	}
+	if !strings.Contains(string(frSearch), "ENGLISH_ONLY_MARKER") {
+		t.Errorf("french search index should include English fallback pages")
+	}
+}
+
 func TestBuild_PostBuildHooks(t *testing.T) {
 	requirePHP(t)
 	defaults := defaultsDir(t)

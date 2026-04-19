@@ -1,0 +1,22 @@
+leaf:
+  name: "Multi-locale Fixture"
+  version: "0.1.0"
+  description: "English default + French overrides + French-only section."
+  content_path: "content"
+  output_path: "dist"
+  production_url: "https://example.test"
+  sections:
+    getting-started: "Getting Started"
+    concepts: "Concepts"
+
+application:
+  environment: dev
+  debug: true
+
+localization:
+  locale: "en"
+  supported_locales:
+    - "en"
+    - "fr"
+  locale_path: "locale"
+  timezone: "UTC"
