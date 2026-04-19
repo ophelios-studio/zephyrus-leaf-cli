@@ -8,12 +8,20 @@
 
 ## Build
 
+Two build modes, selected via tag:
+
 ```sh
-go build ./cmd/leaf -o bin/leaf
-./bin/leaf help
+# Dev mode: LEAF_DEFAULTS_DIR must point at a local zephyrus-leaf checkout.
+# Fast Go rebuilds, no framework baked into the binary.
+go build -o bin/leaf ./cmd/leaf
+
+# Embedded mode: framework compiled into the binary. Standalone after build
+# (still shells out to system `php` until M5 wires FrankenPHP).
+go run ./scripts/stage -src /path/to/zephyrus-leaf
+go build -tags embed_defaults -o bin/leaf ./cmd/leaf
 ```
 
-In dev mode the binary shells out to the system `php` and uses the framework scaffold from `LEAF_DEFAULTS_DIR`. In release mode it will embed FrankenPHP and a phar (M5). The Go code is the same.
+In dev mode the binary shells out to the system `php` and uses the framework scaffold from `LEAF_DEFAULTS_DIR`. Embed mode bakes the framework via `go:embed`. Release mode (M5) will additionally embed FrankenPHP so no system PHP is required.
 
 ## Running the CLI locally
 

@@ -6,8 +6,9 @@ on:
   pull_request:
 
 jobs:
+  # Fast, no-PHP path. Runs go vet + unit tests on every platform.
   unit:
-    name: Unit tests (${{ matrix.os }})
+    name: Unit (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
@@ -18,11 +19,88 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: '1.22'
-      - name: Build
+      - name: Build (non-embed)
         run: go build ./...
       - name: Vet
         run: go vet ./...
       - name: Unit tests
-        # Skip the integration suite here; it needs PHP + a template checkout.
-        # A separate workflow covers that.
         run: go test ./internal/... ./cmd/...
+
+  # Embed-tag path. Stages zephyrus-leaf + its path deps, runs composer install,
+  # builds the standalone binary, smoke-tests `leaf init` + `leaf build`.
+  embed:
+    name: Embed build (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-14, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout CLI
+        uses: actions/checkout@v4
+        with:
+          path: zephyrus-leaf-cli
+
+      # The zephyrus-leaf template references sibling repos via composer path
+      # repos (../zephyrus2, ../zephyrus-leaf-core). All three must land
+      # alongside each other in $GITHUB_WORKSPACE.
+      - name: Checkout zephyrus2
+        uses: actions/checkout@v4
+        with:
+          repository: zephyrus-framework/core
+          path: zephyrus2
+
+      - name: Checkout zephyrus-leaf-core
+        uses: actions/checkout@v4
+        with:
+          repository: ophelios-studio/zephyrus-leaf-core
+          path: zephyrus-leaf-core
+
+      - name: Checkout zephyrus-leaf
+        uses: actions/checkout@v4
+        with:
+          repository: ophelios-studio/zephyrus-leaf
+          path: zephyrus-leaf
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, intl
+          tools: composer:v2
+
+      - name: Composer install (template)
+        working-directory: zephyrus-leaf
+        run: composer install --no-progress --no-interaction
+
+      - name: Stage defaults
+        shell: bash
+        run: |
+          cd zephyrus-leaf-cli
+          go run ./scripts/stage -src "$GITHUB_WORKSPACE/zephyrus-leaf"
+
+      - name: Build embedded binary
+        shell: bash
+        run: |
+          cd zephyrus-leaf-cli
+          go build -tags embed_defaults -o bin/leaf ./cmd/leaf
+
+      - name: Smoke test - init and build
+        shell: bash
+        run: |
+          cd zephyrus-leaf-cli
+          mkdir -p smoke
+          ./bin/leaf init smoke/mydocs
+          cd smoke/mydocs
+          ../../bin/leaf build
+          test -f dist/getting-started/introduction/index.html
+          grep -q "Zephyrus Leaf" dist/getting-started/introduction/index.html
+
+      - name: Integration tests (against staged framework)
+        shell: bash
+        run: |
+          cd zephyrus-leaf-cli
+          LEAF_DEFAULTS_DIR="$PWD/internal/project/framework" go test -timeout 300s ./test/integration/
