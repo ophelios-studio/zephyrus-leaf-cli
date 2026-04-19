@@ -1,0 +1,22 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+# Skeleton. Real pipeline will:
+#   - matrix across darwin-arm64/darwin-amd64/linux-arm64/linux-amd64/windows-amd64
+#   - build phar from pinned leaf-core tag
+#   - cross-compile via FrankenPHP static build
+#   - sign macOS binaries
+#   - generate checksums
+#   - publish GitHub Release with artifacts
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Placeholder
+        run: echo "release pipeline not yet implemented"
