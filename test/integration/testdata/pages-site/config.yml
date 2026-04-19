@@ -1,0 +1,9 @@
+leaf:
+  name: "Pages Fixture"
+  version: "0.1.0"
+  description: "Fixture that exercises templates/pages/ custom routes."
+  content_path: "content"
+  output_path: "dist"
+  production_url: "https://example.test"
+  sections:
+    guide: "Guide"

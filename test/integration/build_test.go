@@ -94,6 +94,46 @@ func copyDir(src, dst string) error {
 // the framework baked in, LEAF_DEFAULTS_DIR unset, init + build should still
 // succeed. Skips when the local environment can't compile with that tag
 // (no staged framework tree).
+func TestBuild_CustomPages(t *testing.T) {
+	requirePHP(t)
+	defaults := defaultsDir(t)
+	bin := buildBinary(t)
+	fixture := prepareFixture(t, "pages-site")
+
+	cmd := exec.Command(bin, "build", "--dir", fixture)
+	cmd.Env = append(os.Environ(), "LEAF_DEFAULTS_DIR="+defaults)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("leaf build failed: %v\n%s", err, out)
+	}
+
+	// /about/index.html contains the about marker.
+	about, err := os.ReadFile(filepath.Join(fixture, "dist", "about", "index.html"))
+	if err != nil {
+		t.Fatalf("/about missing: %v", err)
+	}
+	if !strings.Contains(string(about), "CUSTOM_PAGE_ABOUT_MARKER") {
+		t.Errorf("about marker missing; got:\n%s", about)
+	}
+	if !strings.Contains(string(about), "/about") {
+		t.Errorf("pagePath not propagated to template")
+	}
+
+	// /contact/index.html contains the contact marker.
+	contact, err := os.ReadFile(filepath.Join(fixture, "dist", "contact", "index.html"))
+	if err != nil {
+		t.Fatalf("/contact missing: %v", err)
+	}
+	if !strings.Contains(string(contact), "CUSTOM_PAGE_CONTACT_MARKER") {
+		t.Errorf("contact marker missing; got:\n%s", contact)
+	}
+
+	// Docs page still builds alongside the custom pages.
+	if _, err := os.Stat(filepath.Join(fixture, "dist", "guide", "intro", "index.html")); err != nil {
+		t.Errorf("docs page missing after enabling pages feature: %v", err)
+	}
+}
+
 func TestBuild_Standalone(t *testing.T) {
 	requirePHP(t)
 	repoRoot, _ := filepath.Abs(filepath.Join("..", ".."))
