@@ -41,21 +41,6 @@ jobs:
         with:
           path: zephyrus-leaf-cli
 
-      # The zephyrus-leaf template references sibling repos via composer path
-      # repos (../zephyrus2, ../zephyrus-leaf-core). All three must land
-      # alongside each other in $GITHUB_WORKSPACE.
-      - name: Checkout zephyrus2
-        uses: actions/checkout@v4
-        with:
-          repository: zephyrus-framework/core
-          path: zephyrus2
-
-      - name: Checkout zephyrus-leaf-core
-        uses: actions/checkout@v4
-        with:
-          repository: ophelios-studio/zephyrus-leaf-core
-          path: zephyrus-leaf-core
-
       - name: Checkout zephyrus-leaf
         uses: actions/checkout@v4
         with:

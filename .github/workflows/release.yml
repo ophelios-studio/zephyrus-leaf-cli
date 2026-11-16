@@ -22,18 +22,6 @@ jobs:
         with:
           path: zephyrus-leaf-cli
 
-      - name: Checkout zephyrus2
-        uses: actions/checkout@v4
-        with:
-          repository: zephyrus-framework/core
-          path: zephyrus2
-
-      - name: Checkout zephyrus-leaf-core
-        uses: actions/checkout@v4
-        with:
-          repository: ophelios-studio/zephyrus-leaf-core
-          path: zephyrus-leaf-core
-
       - name: Checkout zephyrus-leaf
         uses: actions/checkout@v4
         with:
