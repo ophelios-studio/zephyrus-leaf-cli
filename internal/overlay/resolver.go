@@ -2,8 +2,8 @@
 // a single directory that the PHP runtime treats as ROOT_DIR.
 //
 // Order of precedence (last write wins):
-//   1. Embedded defaults (templates, assets, fallback config)
-//   2. User project files (content/, templates/, public/, config.yml)
+//  1. Embedded defaults (templates, assets, fallback config)
+//  2. User project files (content/, templates/, public/, config.yml)
 //
 // The merged tree lives under a tempdir for the duration of the build and is
 // cleaned up afterwards.
@@ -21,11 +21,13 @@ import (
 // Source describes one layer of the overlay stack. A Source with higher
 // Priority wins. Zero-value FS means "use the filesystem at Root."
 type Source struct {
-	Name     string // "defaults", "user", etc. Used in error messages.
-	Priority int    // higher wins
-	FS       fs.FS  // if nil, OS filesystem under Root is used
-	Root     string // absolute path when FS is nil
+	Name     string   // "defaults", "user", etc. Used in error messages.
+	Priority int      // higher wins
+	FS       fs.FS    // if nil, OS filesystem under Root is used
+	Root     string   // absolute path when FS is nil
 	Skip     []string // top-level path prefixes this source must not contribute
+	// Top-level path prefixes where a file already present in dst is kept.
+	KeepExisting []string
 }
 
 // Merge walks each source in priority order (ascending) and writes files into
@@ -54,7 +56,7 @@ func copyLayer(src Source, dst string) error {
 		if src.Root == "" {
 			return nil
 		}
-		return copyOSDir(src.Root, dst, src.Skip)
+		return copyOSDir(src.Root, dst, src)
 	}
 	// Abstract fs.FS (e.g. go:embed): no symlinks possible, walk directly.
 	fsys := src.FS
@@ -75,6 +77,9 @@ func copyLayer(src Source, dst string) error {
 		if d.IsDir() {
 			return os.MkdirAll(target, 0o755)
 		}
+		if keepsExisting(path, target, src.KeepExisting) {
+			return nil
+		}
 		return copyFile(fsys, path, target)
 	})
 }
@@ -83,18 +88,18 @@ func copyLayer(src Source, dst string) error {
 // directory symlinks, common in local Composer workspace setups), and writes
 // a real-file copy under dst. Missing roots are not an error (the user may
 // not have a templates/ dir yet, for example).
-func copyOSDir(root, dst string, skips []string) error {
+func copyOSDir(root, dst string, src Source) error {
 	if _, err := os.Stat(root); err != nil {
 		if os.IsNotExist(err) {
 			return nil
 		}
 		return err
 	}
-	return walkCopy(root, dst, "", skips, make(map[string]bool))
+	return walkCopy(root, dst, "", src, make(map[string]bool))
 }
 
-func walkCopy(srcRoot, dstRoot, rel string, skips []string, seen map[string]bool) error {
-	if rel != "" && shouldSkip(rel, skips) {
+func walkCopy(srcRoot, dstRoot, rel string, src Source, seen map[string]bool) error {
+	if rel != "" && shouldSkip(rel, src.Skip) {
 		return nil
 	}
 
@@ -137,7 +142,7 @@ func walkCopy(srcRoot, dstRoot, rel string, skips []string, seen map[string]bool
 			childRel := filepath.Join(rel, e.Name())
 			// Recurse from the original srcRoot so relative paths stay consistent;
 			// but the data comes from the resolved srcPath via an intermediate.
-			if err := walkCopyAt(srcPath, e.Name(), dstRoot, childRel, skips, seen); err != nil {
+			if err := walkCopyAt(srcPath, e.Name(), dstRoot, childRel, src, seen); err != nil {
 				return err
 			}
 		}
@@ -147,14 +152,17 @@ func walkCopy(srcRoot, dstRoot, rel string, skips []string, seen map[string]bool
 	if !info.Mode().IsRegular() {
 		return nil
 	}
+	if keepsExisting(rel, dstPath, src.KeepExisting) {
+		return nil
+	}
 	return copyOSFile(srcPath, dstPath)
 }
 
 // walkCopyAt handles a child entry whose source lives under a (possibly
 // resolved-via-symlink) directory different from the original root. relFromDst
 // is kept so the destination layout mirrors the logical source tree.
-func walkCopyAt(parentSrc, childName, dstRoot, relFromDst string, skips []string, seen map[string]bool) error {
-	if shouldSkip(relFromDst, skips) {
+func walkCopyAt(parentSrc, childName, dstRoot, relFromDst string, src Source, seen map[string]bool) error {
+	if shouldSkip(relFromDst, src.Skip) {
 		return nil
 	}
 	childSrc := filepath.Join(parentSrc, childName)
@@ -188,7 +196,7 @@ func walkCopyAt(parentSrc, childName, dstRoot, relFromDst string, skips []string
 		}
 		for _, e := range entries {
 			childRel := filepath.Join(relFromDst, e.Name())
-			if err := walkCopyAt(childSrc, e.Name(), dstRoot, childRel, skips, seen); err != nil {
+			if err := walkCopyAt(childSrc, e.Name(), dstRoot, childRel, src, seen); err != nil {
 				return err
 			}
 		}
@@ -197,7 +205,18 @@ func walkCopyAt(parentSrc, childName, dstRoot, relFromDst string, skips []string
 	if !info.Mode().IsRegular() {
 		return nil
 	}
+	if keepsExisting(relFromDst, dstPath, src.KeepExisting) {
+		return nil
+	}
 	return copyOSFile(childSrc, dstPath)
+}
+
+func keepsExisting(rel, dstPath string, keeps []string) bool {
+	if !shouldSkip(filepath.ToSlash(rel), keeps) {
+		return false
+	}
+	_, err := os.Lstat(dstPath)
+	return err == nil
 }
 
 func copyOSFile(srcPath, dstPath string) error {

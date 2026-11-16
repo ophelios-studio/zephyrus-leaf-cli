@@ -18,9 +18,9 @@ func readFile(t *testing.T, path string) string {
 
 func TestMerge_UserOverridesDefaults(t *testing.T) {
 	defaults := fstest.MapFS{
-		"templates/layouts/docs.latte":    {Data: []byte("DEFAULT DOCS")},
-		"templates/partials/nav.latte":    {Data: []byte("DEFAULT NAV")},
-		"public/assets/css/app.css":       {Data: []byte("DEFAULT CSS")},
+		"templates/layouts/docs.latte": {Data: []byte("DEFAULT DOCS")},
+		"templates/partials/nav.latte": {Data: []byte("DEFAULT NAV")},
+		"public/assets/css/app.css":    {Data: []byte("DEFAULT CSS")},
 	}
 	userDir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(userDir, "templates", "layouts"), 0o755); err != nil {
@@ -136,6 +136,63 @@ func TestMerge_Skip(t *testing.T) {
 	}
 	if got := readFile(t, filepath.Join(dst, "templates", "docs.latte")); got != "D" {
 		t.Errorf("non-skipped default dropped: %q", got)
+	}
+}
+
+func TestMerge_KeepExisting(t *testing.T) {
+	defaultFiles := map[string]string{
+		"public/index.php":      "DEFAULT INDEX",
+		"public/favicon.ico":    "DEFAULT ICON",
+		"public/assets/app.css": "DEFAULT CSS",
+		"app/Kernel.php":        "DEFAULT KERNEL",
+	}
+	mapFS := fstest.MapFS{}
+	osRoot := t.TempDir()
+	for rel, data := range defaultFiles {
+		mapFS[rel] = &fstest.MapFile{Data: []byte(data)}
+		p := filepath.Join(osRoot, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(data), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	cases := map[string]Source{
+		"fs": {Name: "defaults", FS: mapFS, KeepExisting: []string{"public"}},
+		"os": {Name: "defaults", Root: osRoot, KeepExisting: []string{"public"}},
+	}
+	for name, src := range cases {
+		t.Run(name, func(t *testing.T) {
+			dst := t.TempDir()
+			for rel, data := range map[string]string{
+				"public/favicon.ico": "USER ICON",
+				"app/Kernel.php":     "USER KERNEL",
+			} {
+				p := filepath.Join(dst, filepath.FromSlash(rel))
+				if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(p, []byte(data), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := Merge(dst, []Source{src}); err != nil {
+				t.Fatal(err)
+			}
+			want := map[string]string{
+				"public/index.php":      "DEFAULT INDEX",
+				"public/assets/app.css": "DEFAULT CSS",
+				"public/favicon.ico":    "USER ICON",
+				"app/Kernel.php":        "DEFAULT KERNEL",
+			}
+			for rel, w := range want {
+				if got := readFile(t, filepath.Join(dst, filepath.FromSlash(rel))); got != w {
+					t.Errorf("%s: got %q, want %q", rel, got, w)
+				}
+			}
+		})
 	}
 }
 

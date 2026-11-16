@@ -10,12 +10,15 @@ import (
 	"github.com/ophelios-studio/zephyrus-leaf-cli/internal/project"
 )
 
-// Paths that eject must not touch. These are user-owned and must survive.
+// Paths where the template only fills gaps and never replaces a user file.
+var ejectKeep = []string{"public"}
+
+// Paths that eject never copies: user-owned files that must survive.
 var ejectSkip = []string{
 	"content",
 	"config.yml",
+	"README.md",
 	"templates",
-	"public",
 	"dist",
 	"cache",
 	".git",
@@ -58,7 +61,7 @@ func runEject(args []string) int {
 	}
 
 	if err := overlay.Merge(root, []overlay.Source{
-		{Name: "framework", Root: defaults.Root, FS: defaults.FS, Skip: ejectSkip},
+		{Name: "framework", Root: defaults.Root, FS: defaults.FS, Skip: ejectSkip, KeepExisting: ejectKeep},
 	}); err != nil {
 		fmt.Fprintf(os.Stderr, "leaf eject: %v\n", err)
 		return 1
