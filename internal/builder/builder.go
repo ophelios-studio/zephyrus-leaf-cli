@@ -10,6 +10,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
+	"strings"
 
 	"github.com/ophelios-studio/zephyrus-leaf-cli/internal/overlay"
 	"github.com/ophelios-studio/zephyrus-leaf-cli/internal/project"
@@ -125,10 +127,21 @@ func runPostBuildHooks(ctx context.Context, projectRoot string, hooks []project.
 			if errors.As(err, &exitErr) {
 				return fmt.Errorf("hook %v exited %d", hook.Argv, exitErr.ExitCode())
 			}
+			if errors.Is(err, errBadExecutableFormat) {
+				return fmt.Errorf("hook %v: %w; hooks run without a shell and this file is not an executable for this system, name its interpreter first, for example %s", hook.Argv, err, interpreterExample(hook.Argv))
+			}
 			return fmt.Errorf("hook %v: %w", hook.Argv, err)
 		}
 	}
 	return nil
+}
+
+func interpreterExample(argv []string) string {
+	quoted := []string{strconv.Quote("bash")}
+	for _, arg := range argv {
+		quoted = append(quoted, strconv.Quote(arg))
+	}
+	return "[" + strings.Join(quoted, ", ") + "]"
 }
 
 func replaceDir(dst, src string) error {
