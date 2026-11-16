@@ -128,7 +128,7 @@ func runPostBuildHooks(ctx context.Context, projectRoot string, hooks []project.
 				return fmt.Errorf("hook %v exited %d", hook.Argv, exitErr.ExitCode())
 			}
 			if errors.Is(err, errBadExecutableFormat) {
-				return fmt.Errorf("hook %v: %w; hooks run without a shell and this file is not an executable for this system, name its interpreter first, for example %s", hook.Argv, err, interpreterExample(hook.Argv))
+				return fmt.Errorf("hook %v: %w; hooks run without a shell, so name the interpreter first, for example %s", hook.Argv, err, interpreterExample(hook.Argv))
 			}
 			return fmt.Errorf("hook %v: %w", hook.Argv, err)
 		}
@@ -137,7 +137,7 @@ func runPostBuildHooks(ctx context.Context, projectRoot string, hooks []project.
 }
 
 func interpreterExample(argv []string) string {
-	quoted := []string{strconv.Quote("bash")}
+	quoted := []string{`"bash"`}
 	for _, arg := range argv {
 		quoted = append(quoted, strconv.Quote(arg))
 	}

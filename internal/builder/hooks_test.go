@@ -22,8 +22,8 @@ func TestRunPostBuildHooks_NonExecutableFileNamesTheInterpreterFix(t *testing.T)
 	}
 
 	want := "hook [./hook.sh arg]: " + errors.Unwrap(err).Error() +
-		"; hooks run without a shell and this file is not an executable for this system," +
-		` name its interpreter first, for example ["bash", "./hook.sh", "arg"]`
+		"; hooks run without a shell, so name the interpreter first," +
+		` for example ["bash", "./hook.sh", "arg"]`
 	if err.Error() != want {
 		t.Errorf("unexpected error\n got: %s\nwant: %s", err.Error(), want)
 	}
