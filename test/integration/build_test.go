@@ -72,6 +72,27 @@ func prepareFixture(t *testing.T, name string) string {
 	return dst
 }
 
+// runHooksThroughBash rewrites the fixture hooks to name bash first, because a
+// .sh file is not an executable on Windows and hooks run without a shell.
+func runHooksThroughBash(t *testing.T, fixture string) {
+	t.Helper()
+	config := filepath.Join(fixture, "config.yml")
+	data, err := os.ReadFile(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rewritten := strings.NewReplacer(
+		`"./scripts/touch-marker.sh"`, `["bash", "./scripts/touch-marker.sh"]`,
+		`["./scripts/write-stamp.sh", "second-hook"]`, `["bash", "./scripts/write-stamp.sh", "second-hook"]`,
+	).Replace(string(data))
+	if rewritten == string(data) {
+		t.Fatal("fixture hooks were not rewritten")
+	}
+	if err := os.WriteFile(config, []byte(rewritten), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func copyDir(src, dst string) error {
 	return filepath.Walk(src, func(p string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -170,6 +191,9 @@ func TestBuild_PostBuildHooks(t *testing.T) {
 	defaults := defaultsDir(t)
 	bin := buildBinary(t)
 	fixture := prepareFixture(t, "hooks-site")
+	if runtime.GOOS == "windows" {
+		runHooksThroughBash(t, fixture)
+	}
 
 	// Clean any stale sentinels from a prior run.
 	os.Remove(filepath.Join(fixture, "hook-marker.txt"))
@@ -207,6 +231,9 @@ func TestBuild_PostBuildHookFailureFailsBuild(t *testing.T) {
 	defaults := defaultsDir(t)
 	bin := buildBinary(t)
 	fixture := prepareFixture(t, "hooks-site")
+	if runtime.GOOS == "windows" {
+		runHooksThroughBash(t, fixture)
+	}
 
 	// Replace the first hook with a failing one.
 	failing := filepath.Join(fixture, "scripts", "touch-marker.sh")
