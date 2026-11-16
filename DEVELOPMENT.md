@@ -53,7 +53,8 @@ internal/
   project/             Config loader, defaults-source resolver
   runtime/             PHPRuntime interface with exec + frankenphp + mock impls
 test/integration/      End-to-end tests running the real binary against fixtures
-scripts/               Release-time build scripts (phar, scaffolds, matrix)
+scripts/stage/         Stages the framework template into internal/project/framework for go:embed
+scripts/install.sh     Installer for released binaries
 .github/workflows/     CI and release pipelines
 .claude/plans/         Plan files driving implementation (commit with feature)
 ```

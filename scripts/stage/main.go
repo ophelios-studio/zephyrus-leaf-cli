@@ -26,13 +26,13 @@ func skipPrefix(rel string) bool {
 
 	// Top-level dirs/files excluded entirely.
 	topExact := map[string]bool{
-		"dist":              true,
-		"cache":             true,
-		"node_modules":      true,
+		"dist":               true,
+		"cache":              true,
+		"node_modules":       true,
 		"docker-compose.yml": true,
-		"CLAUDE.md":         true,
-		"tests":             true,
-		"phpunit.xml":       true,
+		"CLAUDE.md":          true,
+		"tests":              true,
+		"phpunit.xml":        true,
 	}
 	// First path segment.
 	first := rel
